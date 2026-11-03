@@ -9,6 +9,6 @@
   "run_limit": "2,400 steps (2 minutes at 20 Hz)",
   "reset_notes": "Stand the lock back upright at its start mark and put the part back in the middle of the bed.",
   "fidelity": "Approximate: the machine is an unpowered mock-up, and the lock is a block set on a pad rather than a padlock through a hasp, so the rule is the order of actions, not a physical interlock. Objects are rigid primitives with the simulator's default contact friction.",
-  "scores": "Dream-1 run: TBD; demo: TBD",
+  "scores": "Dream-1 run: 0; demo: 1.0",
   "media": ""
 }

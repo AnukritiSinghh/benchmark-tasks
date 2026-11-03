@@ -38,7 +38,7 @@ python -m pytest test_lockout.py -q
 
 ## Runtime and seeds
 
-- Run limit 2,400 control steps (2 minutes at 20 Hz). The scripted demo finishes in about 21 s (about 420 steps).
+- Run limit 2,400 control steps (2 minutes at 20 Hz). The scripted demo reaches 1.0 in 402 steps (about 20 s).
 - `-E object_jitter=0`: every object starts exactly where `lockout.py` puts it, so no seed is needed. With
   jitter, seeded resets shift the two loose objects by up to 3 cm; the scoring follows each object's actual start.
 - A trial ends early once the full-score state has held for 1 s.

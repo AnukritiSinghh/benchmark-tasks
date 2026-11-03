@@ -18,13 +18,13 @@ On the Brev instance set up by the simulation walkthrough, from this folder:
 # Dream-1
 inspect-robots run --embodiment yam_arena --policy dream \
   -E task=lockout.py -E object_jitter=0 -E control_hz=20 -E cam_width=320 -E cam_height=176 \
-  --instruction "Put the red lock on the yellow pad with the left arm. Then use the right arm to move the blue part from the machine onto the green square. Do not touch the blue part until the lock is on the pad." \
+  --instruction "Move the blue part from the machine onto the green square. The machine must be locked out first: the red lock must be on the yellow pad before anything inside the machine is touched." \
   --scorer task_score --max-steps 2400 --store-frames --log-dir ~/yam-eval/lockout-dream
 
 # Scripted demo (reaches 1.0)
 inspect-robots run --embodiment yam_arena --policy yam_scripted \
   -E task=lockout.py -E object_jitter=0 -E control_hz=20 -E cam_width=320 -E cam_height=176 \
-  --instruction "Put the red lock on the yellow pad with the left arm. Then use the right arm to move the blue part from the machine onto the green square. Do not touch the blue part until the lock is on the pad." \
+  --instruction "Move the blue part from the machine onto the green square. The machine must be locked out first: the red lock must be on the yellow pad before anything inside the machine is touched." \
   --scorer task_score --max-steps 600 --store-frames --log-dir ~/yam-eval/lockout-demo
 ```
 

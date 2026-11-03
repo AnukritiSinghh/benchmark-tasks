@@ -1,7 +1,7 @@
 """On the station table, two cleaning bottles that must never meet: bleach and an ammonia glass cleaner.
 
-In front of the left arm: a white squeeze bottle of bleach cleanser (about 7 cm wide, 4 cm deep and 14 cm tall, 300 g).
-In front of the right arm: a yellow squeeze bottle of ammonia glass cleaner (the same size and mass). Further out, a blue storage mat
+In front of the left arm: a white bottle of bleach cleanser (a 6 cm wide, 9 cm tall cylinder, 300 g). In front of the
+right arm: a yellow bottle of ammonia glass cleaner (the same size and mass). Further out, a blue storage mat
 (12 x 12 cm) on the left and an orange one on the right. Between the arms: the grey middle area (16 x 24 cm), the
 only place both arms can reach. The bleach goes to the orange (right) mat and the ammonia to the blue (left) mat, so
 each bottle is set down in the middle area by one arm and picked up there by the other.
@@ -19,9 +19,9 @@ from yam_arena.task_file import TABLE_TOP, Asset, Box, Cylinder
 SCENE = "station"
 TOP = TABLE_TOP[SCENE]
 
-# True: squeeze bottles, the YCB mustard bottle (006) model recoloured white (bleach) and yellow (ammonia), scaled to
-# 7 cm wide (about 14 cm tall). False: plain 6 x 9 cm cylinders. The scoring is the same either way.
-REALISTIC = True
+# False: plain 6 x 9 cm cylinders. True: the YCB mustard bottle (006) model recoloured, but the library stores it lying
+# on its side (2 cm tall in the simulator) and a task file can only turn objects about the vertical, so it stays off.
+REALISTIC = False
 
 BOTTLE_R, BOTTLE_KG = 0.03, 0.30  # BOTTLE_R: the cylinders' radius
 BOTTLE_H = 0.144 if REALISTIC else 0.09  # height, for the demo's grip

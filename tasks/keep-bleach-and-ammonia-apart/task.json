@@ -9,6 +9,6 @@
   "run_limit": "3,600 steps (3 minutes at 20 Hz)",
   "reset_notes": "Stand each bottle back at its start mark.",
   "fidelity": "Approximate: the bottles are rigid cylinders (sealed, no liquid), and the rule is checked on the middle area rather than as a distance; the layout keeps the bottles about 20 cm apart everywhere else. Objects use the simulator's default contact friction.",
-  "scores": "Dream-1 run: TBD; demo: TBD",
+  "scores": "Dream-1 run: 0; demo: 1.0",
   "media": ""
 }

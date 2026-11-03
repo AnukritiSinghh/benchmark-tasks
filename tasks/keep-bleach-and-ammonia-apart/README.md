@@ -30,8 +30,6 @@ Offline checks (no simulator): `python -m pytest test_apart.py -q`
 
 - Run limit 3,600 control steps (3 minutes at 20 Hz); the scripted demo takes about 42 s.
 - `-E object_jitter=0` fixes the layout, so no seed is needed.
-- `REALISTIC = True` in `apart.py` swaps the cylinders for library models (the YCB bleach cleanser and a packer
-  bottle); the scoring is unchanged.
 
 ## Scoring
 

@@ -1,7 +1,7 @@
 """On the station table, two cleaning bottles that must never meet: bleach and an ammonia glass cleaner.
 
-In front of the left arm: a white bottle of bleach cleanser (a 6 cm wide, 9 cm tall cylinder, 300 g). In front of the
-right arm: a yellow bottle of ammonia glass cleaner (the same size and mass). Further out, a blue storage mat
+In front of the left arm: a white squeeze bottle of bleach cleanser (about 7 cm wide, 4 cm deep and 14 cm tall, 300 g).
+In front of the right arm: a yellow squeeze bottle of ammonia glass cleaner (the same size and mass). Further out, a blue storage mat
 (12 x 12 cm) on the left and an orange one on the right. Between the arms: the grey middle area (16 x 24 cm), the
 only place both arms can reach. The bleach goes to the orange (right) mat and the ammonia to the blue (left) mat, so
 each bottle is set down in the middle area by one arm and picked up there by the other.
@@ -19,11 +19,13 @@ from yam_arena.task_file import TABLE_TOP, Asset, Box, Cylinder
 SCENE = "station"
 TOP = TABLE_TOP[SCENE]
 
-# False: plain cylinders (reliable, exactly reproducible). True: library models, the YCB bleach cleanser and a packer
-# bottle recoloured yellow. Check them in the catalog render first, and update BOTTLE_H for the demo's grip heights.
-REALISTIC = False
+# True: squeeze bottles, the YCB mustard bottle (006) model recoloured white (bleach) and yellow (ammonia), scaled to
+# 7 cm wide (about 14 cm tall). False: plain 6 x 9 cm cylinders. The scoring is the same either way.
+REALISTIC = True
 
-BOTTLE_R, BOTTLE_H, BOTTLE_KG = 0.03, 0.09, 0.30
+BOTTLE_R, BOTTLE_KG = 0.03, 0.30  # BOTTLE_R: the cylinders' radius
+BOTTLE_H = 0.144 if REALISTIC else 0.09  # height, for the demo's grip
+GRIP_BELOW_TOP = 0.04 if REALISTIC else 0.03  # grip below the cap (the bottle's neck is too narrow to hold)
 BLEACH_XY, AMMONIA_XY = (0.16, 0.30), (0.16, -0.30)
 WHITE, YELLOW = (0.95, 0.95, 0.95), (0.95, 0.85, 0.15)
 
@@ -33,9 +35,8 @@ MIDDLE = Box("middle_area", pos=(0.25, 0.0, TOP + 0.002), size=(0.16, 0.24, 0.00
 MAT_TOP = TOP + 0.004
 
 if REALISTIC:
-    BLEACH = Asset("bleach", "soft_scrub_ycb_robolab", xy=BLEACH_XY, extent=2 * BOTTLE_R, mass=BOTTLE_KG)
-    AMMONIA = Asset("ammonia", "whitepackerbottle_a01_vomp_robolab", xy=AMMONIA_XY, extent=2 * BOTTLE_R, mass=BOTTLE_KG,
-                    color=YELLOW)
+    BLEACH = Asset("bleach", "mustard_bottle", xy=BLEACH_XY, extent=0.07, mass=BOTTLE_KG, color=WHITE)
+    AMMONIA = Asset("ammonia", "mustard_bottle", xy=AMMONIA_XY, extent=0.07, mass=BOTTLE_KG, color=YELLOW)
 else:
     BLEACH = Cylinder("bleach", pos=(*BLEACH_XY, TOP + BOTTLE_H / 2), radius=BOTTLE_R, height=BOTTLE_H, mass=BOTTLE_KG,
                       color=WHITE)
@@ -133,8 +134,8 @@ LEFT_PARK, RIGHT_PARK = (0.18, 0.24, TRAVEL), (0.18, -0.24, TRAVEL)
 
 
 def _grip(xy, surface, place=False):
-    """Grip 3 cm below the bottle's top (a grip at its middle would put the fingers' base on its cap)."""
-    return (xy[0], xy[1], surface + BOTTLE_H - 0.03 + (0.005 if place else 0.0))
+    """Grip just below the bottle's top (a grip at its middle would put the fingers' base on its cap)."""
+    return (xy[0], xy[1], surface + BOTTLE_H - GRIP_BELOW_TOP + (0.005 if place else 0.0))
 
 
 def _move(src, dst, src_surface, dst_surface):

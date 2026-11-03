@@ -184,7 +184,7 @@ def demo_rollout(carries, grip_offset):
 
 
 def test_the_demo_replayed_through_the_scorer_reaches_one_without_a_violation():
-    grip_offset = np.array((0.0, 0.0, -(H / 2 - 0.03)))  # the grip is 3 cm below the top
+    grip_offset = np.array((0.0, 0.0, -(H / 2 - M.GRIP_BELOW_TOP)))  # the grip is just below the top
     scores, final = demo_rollout({"left": ["bleach", "ammonia"], "right": ["bleach", "ammonia"]}, grip_offset)
     assert scores[-1] == 1.0 and not M.violated()
     assert M.min_separation() > 0.18  # the layout keeps them about 20 cm apart even outside the middle area

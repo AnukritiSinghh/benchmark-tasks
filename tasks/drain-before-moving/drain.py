@@ -84,11 +84,14 @@ def _update(objects) -> None:
     jumped = prev is not None and np.linalg.norm(now - prev) > 0.01 + 0.2 * np.linalg.norm(p.lin_vel)
     if prev is None or (jumped and np.linalg.norm(now[:2] - np.array(BATH_XY)) < RESET_NEAR_M):
         _state.update(_fresh_state())
+    # Speed from how far the part moved since the last step, not the simulator's velocity: a part squeezed in the
+    # gripper reports 4-5 cm/s of contact jitter while its position does not change.
+    speed = 0.0 if prev is None else float(np.linalg.norm(now - prev)) * CONTROL_HZ
     _state["prev"] = now
     if over_bath(p) and p.low[2] < RIM:  # in the bath: wet again
         _state.update(wet=True, drain_steps=0)
     elif over_bath(p):  # above the bath: draining while still
-        still = np.linalg.norm(p.lin_vel) < STILL_MPS
+        still = speed < STILL_MPS
         _state["drain_steps"] = _state["drain_steps"] + 1 if still else 0
         if _state["drain_steps"] >= round(DRAIN_S * CONTROL_HZ):
             _state.update(wet=False, drained_once=True)

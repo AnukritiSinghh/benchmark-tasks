@@ -8,6 +8,8 @@ yam_arena's scene builder and step when the simulator starts:
     mech.prismatic("drawer", axis="X", anchor=(x, y, z), lower=0, upper=0.1, parent="carcass")  # slides in a body
     mech.weld("stripe", parent="wheel")              # two free objects move as one rigid body
     mech.on_tick(fn)                                 # fn(sim) after every control step, before scoring
+    mech.no_gravity("tongue")                        # a part clamped in a slide stays where it is pushed
+    mech.ghost("blade")                              # seen, but passes through everything
 
 ``sim`` gives ``t`` (s since the episode started), ``states`` (as score() sees them) and
 ``set_color(name, rgb)`` / ``set_velocity(name, lin=None, ang=None)``.
@@ -43,8 +45,13 @@ class Joint:
     parent: str | None = None  # None: the world
 
 
+SOLVER_POSITION_ITERS = 32  # per jointed body (PhysX default 4)
+SOLVER_VELOCITY_ITERS = 4
 JOINTS: dict[str, Joint] = {}
+COMPOUNDS: dict[str, list] = {}  # extra boxes making a free object one rigid body: name -> [(size, offset, colour)]
 ORIENT: dict[str, tuple[float, float, float, float]] = {}  # spawn rotation (x, y, z, w) by object name
+NO_GRAVITY: set[str] = set()  # free objects gravity doesn't act on (e.g. a part held in a friction slot)
+GHOSTS: set[str] = set()  # objects that collide with nothing (e.g. a dummy saw blade that passes through the work)
 _TICKS: list = []
 _SPECS: dict = {}  # task objects by name, recorded as the scene is built
 
@@ -59,6 +66,24 @@ def prismatic(name, axis, anchor, lower=None, upper=None, stiffness=0.0, damping
 
 def weld(name, parent):
     JOINTS[name] = Joint("fixed", parent=parent)
+
+
+def compound(name, parts):
+    """Make a task object one rigid body with extra boxes: ``parts`` is [(size, offset, rgb), ...] or
+    [(size, offset, rgb, (rx, ry, rz)), ...], each box's size, its centre's offset from the object's centre (m, world
+    axes at spawn) and optionally its rotation (degrees about x, y, z). The object's mass is the whole body's, spread
+    over all its boxes. Unlike welded objects, a compound body is exactly rigid."""
+    COMPOUNDS[name] = [(tuple(p[0]), tuple(p[1]), tuple(p[2]), tuple(p[3]) if len(p) > 3 else None) for p in parts]
+
+
+def no_gravity(name):
+    """Gravity doesn't act on this object: a part clamped in a slide (held by friction) stays where it is put."""
+    NO_GRAVITY.add(name)
+
+
+def ghost(name):
+    """The object collides with nothing: it is seen but passes through everything."""
+    GHOSTS.add(name)
 
 
 def orient(name, quat_xyzw):
@@ -92,6 +117,31 @@ def _inv_quatf(name):
     return Gf.Quatf(w, -x, -y, -z)
 
 
+def _add_parts(prim, spec) -> None:
+    """The extra boxes of a compound body: collision cubes with their own look, children of the body's prim."""
+    from pxr import Gf, Sdf, UsdGeom, UsdPhysics, UsdShade
+
+    stage = prim.GetStage()
+    rot_t = _rot(spec.name).T
+    for i, (size, offset, rgb, rpy) in enumerate(COMPOUNDS[spec.name]):
+        path = prim.GetPath().AppendChild(f"part{i}")
+        cube = UsdGeom.Cube.Define(stage, path)
+        cube.CreateSizeAttr(1.0)
+        xf = UsdGeom.Xformable(cube)
+        xf.AddTranslateOp().Set(Gf.Vec3d(*(rot_t @ np.asarray(offset, dtype=float)).tolist()))
+        if rpy is not None:
+            xf.AddRotateXYZOp().Set(Gf.Vec3f(*rpy))
+        xf.AddScaleOp().Set(Gf.Vec3f(*size))
+        UsdPhysics.CollisionAPI.Apply(cube.GetPrim())
+        material = UsdShade.Material.Define(stage, path.AppendChild("look"))
+        shader = UsdShade.Shader.Define(stage, material.GetPath().AppendChild("shader"))
+        shader.CreateIdAttr("UsdPreviewSurface")
+        shader.CreateInput("diffuseColor", Sdf.ValueTypeNames.Color3f).Set(Gf.Vec3f(*(c ** 2.2 for c in rgb)))
+        shader.CreateInput("roughness", Sdf.ValueTypeNames.Float).Set(0.4)
+        material.CreateSurfaceOutput().ConnectToSource(shader.ConnectableAPI(), "surface")
+        UsdShade.MaterialBindingAPI.Apply(cube.GetPrim()).Bind(material)
+
+
 def _author_joint(prim, spec, j: Joint) -> None:
     from pxr import Gf, UsdPhysics
 
@@ -109,6 +159,13 @@ def _author_joint(prim, spec, j: Joint) -> None:
         frame0 = _rot(j.parent).T @ (anchor - np.asarray(_SPECS[j.parent].pos, dtype=float))
         rot0 = _inv_quatf(j.parent)
     joint.CreateBody1Rel().SetTargets([prim.GetPath()])
+    # Joints between free bodies are solved iteratively; the default 4 iterations let welds and slides drift under
+    # gravity. More iterations keep welded parts rigid and jointed parts where they are put.
+    from pxr import PhysxSchema
+
+    body = PhysxSchema.PhysxRigidBodyAPI.Apply(prim)
+    body.CreateSolverPositionIterationCountAttr(SOLVER_POSITION_ITERS)
+    body.CreateSolverVelocityIterationCountAttr(SOLVER_VELOCITY_ITERS)
     joint.CreateLocalPos0Attr(Gf.Vec3f(*frame0.tolist()))
     joint.CreateLocalRot0Attr(rot0)
     joint.CreateLocalPos1Attr(Gf.Vec3f(*(_rot(spec.name).T @ (anchor - centre)).tolist()))
@@ -148,14 +205,27 @@ def _patch_scene(scene) -> None:
                 initial_pose=Pose(position_xyz=tuple(spec.pos), rotation_xyzw=ORIENT[spec.name]),
             )
         j = JOINTS.get(spec.name)
-        if j is not None:
+        if j is not None or spec.name in COMPOUNDS or spec.name in NO_GRAVITY or spec.name in GHOSTS:
             cfg = obj.object_cfg.spawn  # Arena builds object_cfg when the Object is made
             inner = getattr(cfg.func, "__wrapped__", cfg.func)
 
             @clone
             def spawn(prim_path, cfg_, *args, **kwargs):
                 prim = inner(prim_path, cfg_, *args, **kwargs)
-                _author_joint(prim, spec, j)
+                if spec.name in COMPOUNDS:
+                    _add_parts(prim, spec)
+                if j is not None:
+                    _author_joint(prim, spec, j)
+                if spec.name in NO_GRAVITY:
+                    from pxr import PhysxSchema
+
+                    PhysxSchema.PhysxRigidBodyAPI.Apply(prim).CreateDisableGravityAttr(True)
+                if spec.name in GHOSTS:
+                    from pxr import Usd, UsdPhysics
+
+                    for part in Usd.PrimRange(prim):
+                        if part.HasAPI(UsdPhysics.CollisionAPI):
+                            UsdPhysics.CollisionAPI(part).CreateCollisionEnabledAttr(False)
                 return prim
 
             cfg.func = spawn

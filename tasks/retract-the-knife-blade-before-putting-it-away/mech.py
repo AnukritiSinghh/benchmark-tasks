@@ -14,8 +14,9 @@ yam_arena's scene builder and step when the simulator starts:
 ``sim`` gives ``t`` (s since the episode started), ``states`` (as score() sees them) and
 ``set_color(name, rgb)`` / ``set_velocity(name, lin=None, ang=None)``.
 
-score() and ``sim.states`` also hold "left_tcp" / "right_tcp" (the point between the fingertips) and
-"left_gripper" / "right_gripper" (the gripper link). ``mech.orient(name, quat_xyzw)`` turns an object at spawn
+score() and ``sim.states`` also hold "left_tcp" / "right_tcp" (the point between the fingertips),
+"left_gripper" / "right_gripper" (the gripper link) and "<arm>_finger_l" / "<arm>_finger_r" (each finger's
+centre line at the TCP's height; the fingertip ends are 13 mm further along the gripper's +Z). ``mech.orient(name, quat_xyzw)`` turns an object at spawn
 (e.g. a wheel on a sideways axle), which the task file's own yaw cannot do.
 
 Joint anchors are world points (m) in the starting layout; revolute limits are degrees, prismatic limits metres.
@@ -251,6 +252,17 @@ def _patch_scene(scene) -> None:
             for key, p in ((f"{arm}_gripper", pose[0, :3] - origin), (f"{arm}_tcp", tcp[0])):
                 p = p.detach().cpu().numpy().astype(np.float64)
                 out[key] = ObjectState(p, quat, z, z, p - 0.01, p + 0.01)
+            # Each finger at the TCP's height: the TCP moved sideways to that finger's centre line
+            # ("<arm>_finger_l" / "<arm>_finger_r"; quat is the gripper's, its +Z the approach axis).
+            fids = [robot.find_bodies(n)[0][0] for n in ("tip_left", "tip_right")]
+            fp = robot.data.body_link_pose_w.torch[0, fids, :3]
+            approach = quat_apply(pose[:, 3:7], torch.tensor([[0.0, 0.0, 1.0]], dtype=pose.dtype, device=pose.device))[0]
+            mid = fp.mean(dim=0)
+            for side, j in (("l", 0), ("r", 1)):
+                lat = fp[j] - mid
+                lat = lat - torch.dot(lat, approach) * approach
+                p = (tcp[0] + lat).detach().cpu().numpy().astype(np.float64)
+                out[f"{arm}_finger_{side}"] = ObjectState(p, quat, z, z, p - 0.01, p + 0.01)
         return out
 
     scene.task_object = task_object

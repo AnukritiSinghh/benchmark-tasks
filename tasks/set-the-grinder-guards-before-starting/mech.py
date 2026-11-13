@@ -14,8 +14,9 @@ yam_arena's scene builder and step when the simulator starts:
 ``sim`` gives ``t`` (s since the episode started), ``states`` (as score() sees them) and
 ``set_color(name, rgb)`` / ``set_velocity(name, lin=None, ang=None)``.
 
-score() and ``sim.states`` also hold "left_tcp" / "right_tcp" (the point between the fingertips) and
-"left_gripper" / "right_gripper" (the gripper link). ``mech.orient(name, quat_xyzw)`` turns an object at spawn
+score() and ``sim.states`` also hold "left_tcp" / "right_tcp" (the point between the fingertips),
+"left_gripper" / "right_gripper" (the gripper link) and "<arm>_finger_l" / "<arm>_finger_r" (each finger's
+centre line at the TCP's height; the fingertip ends are 13 mm further along the gripper's +Z). ``mech.orient(name, quat_xyzw)`` turns an object at spawn
 (e.g. a wheel on a sideways axle), which the task file's own yaw cannot do.
 
 Joint anchors are world points (m) in the starting layout; revolute limits are degrees, prismatic limits metres.
@@ -52,6 +53,7 @@ COMPOUNDS: dict[str, list] = {}  # extra boxes making a free object one rigid bo
 ORIENT: dict[str, tuple[float, float, float, float]] = {}  # spawn rotation (x, y, z, w) by object name
 NO_GRAVITY: set[str] = set()  # free objects gravity doesn't act on (e.g. a part held in a friction slot)
 GHOSTS: set[str] = set()  # objects that collide with nothing (e.g. a dummy saw blade that passes through the work)
+MASS_CENTRES: dict[str, tuple] = {}  # centre of mass offsets (m, world axes at spawn) by object name
 _TICKS: list = []
 _SPECS: dict = {}  # task objects by name, recorded as the scene is built
 
@@ -74,6 +76,12 @@ def compound(name, parts):
     axes at spawn) and optionally its rotation (degrees about x, y, z). The object's mass is the whole body's, spread
     over all its boxes. Unlike welded objects, a compound body is exactly rigid."""
     COMPOUNDS[name] = [(tuple(p[0]), tuple(p[1]), tuple(p[2]), tuple(p[3]) if len(p) > 3 else None) for p in parts]
+
+
+def mass_centre(name, offset):
+    """Put the object's centre of mass at ``offset`` from its centre (m, world axes at spawn), for a body whose mass is
+    not spread evenly over its boxes (a tool whose heavy parts sit in one place)."""
+    MASS_CENTRES[name] = tuple(float(v) for v in offset)
 
 
 def no_gravity(name):
@@ -205,7 +213,8 @@ def _patch_scene(scene) -> None:
                 initial_pose=Pose(position_xyz=tuple(spec.pos), rotation_xyzw=ORIENT[spec.name]),
             )
         j = JOINTS.get(spec.name)
-        if j is not None or spec.name in COMPOUNDS or spec.name in NO_GRAVITY or spec.name in GHOSTS:
+        if (j is not None or spec.name in COMPOUNDS or spec.name in NO_GRAVITY or spec.name in GHOSTS
+                or spec.name in MASS_CENTRES):
             cfg = obj.object_cfg.spawn  # Arena builds object_cfg when the Object is made
             inner = getattr(cfg.func, "__wrapped__", cfg.func)
 
@@ -214,6 +223,11 @@ def _patch_scene(scene) -> None:
                 prim = inner(prim_path, cfg_, *args, **kwargs)
                 if spec.name in COMPOUNDS:
                     _add_parts(prim, spec)
+                if spec.name in MASS_CENTRES:
+                    from pxr import Gf, UsdPhysics
+
+                    off = _rot(spec.name).T @ np.asarray(MASS_CENTRES[spec.name], dtype=float)
+                    UsdPhysics.MassAPI.Apply(prim).CreateCenterOfMassAttr(Gf.Vec3f(*off.tolist()))
                 if j is not None:
                     _author_joint(prim, spec, j)
                 if spec.name in NO_GRAVITY:
@@ -251,6 +265,17 @@ def _patch_scene(scene) -> None:
             for key, p in ((f"{arm}_gripper", pose[0, :3] - origin), (f"{arm}_tcp", tcp[0])):
                 p = p.detach().cpu().numpy().astype(np.float64)
                 out[key] = ObjectState(p, quat, z, z, p - 0.01, p + 0.01)
+            # Each finger at the TCP's height: the TCP moved sideways to that finger's centre line
+            # ("<arm>_finger_l" / "<arm>_finger_r"; quat is the gripper's, its +Z the approach axis).
+            fids = [robot.find_bodies(n)[0][0] for n in ("tip_left", "tip_right")]
+            fp = robot.data.body_link_pose_w.torch[0, fids, :3]
+            approach = quat_apply(pose[:, 3:7], torch.tensor([[0.0, 0.0, 1.0]], dtype=pose.dtype, device=pose.device))[0]
+            mid = fp.mean(dim=0)
+            for side, j in (("l", 0), ("r", 1)):
+                lat = fp[j] - mid
+                lat = lat - torch.dot(lat, approach) * approach
+                p = (tcp[0] + lat).detach().cpu().numpy().astype(np.float64)
+                out[f"{arm}_finger_{side}"] = ObjectState(p, quat, z, z, p - 0.01, p + 0.01)
         return out
 
     scene.task_object = task_object

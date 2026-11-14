@@ -192,6 +192,31 @@ def _author_joint(prim, spec, j: Joint) -> None:
         drive.CreateTargetPositionAttr(float(j.target))
 
 
+_QUAT_CHECK = bool(__import__("os").environ.get("MECH_QUAT_CHECK"))
+_QUAT_LOGGED: dict = {}
+
+
+def matrix_to_quat_xyzw(r) -> np.ndarray:
+    """A rotation matrix as a unit quaternion (x, y, z, w), with w >= 0."""
+    r = np.asarray(r, dtype=float)
+    t = np.trace(r)
+    if t > 0.0:
+        s = 2.0 * np.sqrt(t + 1.0)
+        q = [(r[2, 1] - r[1, 2]) / s, (r[0, 2] - r[2, 0]) / s, (r[1, 0] - r[0, 1]) / s, 0.25 * s]
+    elif r[0, 0] > r[1, 1] and r[0, 0] > r[2, 2]:
+        s = 2.0 * np.sqrt(1.0 + r[0, 0] - r[1, 1] - r[2, 2])
+        q = [0.25 * s, (r[0, 1] + r[1, 0]) / s, (r[0, 2] + r[2, 0]) / s, (r[2, 1] - r[1, 2]) / s]
+    elif r[1, 1] > r[2, 2]:
+        s = 2.0 * np.sqrt(1.0 + r[1, 1] - r[0, 0] - r[2, 2])
+        q = [(r[0, 1] + r[1, 0]) / s, 0.25 * s, (r[1, 2] + r[2, 1]) / s, (r[0, 2] - r[2, 0]) / s]
+    else:
+        s = 2.0 * np.sqrt(1.0 + r[2, 2] - r[0, 0] - r[1, 1])
+        q = [(r[0, 2] + r[2, 0]) / s, (r[1, 2] + r[2, 1]) / s, 0.25 * s, (r[1, 0] - r[0, 1]) / s]
+    q = np.asarray(q, dtype=float)
+    q /= np.linalg.norm(q)
+    return -q if q[3] < 0 else q
+
+
 def _patch_scene(scene) -> None:
     from isaaclab.sim.utils import clone
 
@@ -260,7 +285,16 @@ def _patch_scene(scene) -> None:
             pose = robot.data.body_link_pose_w.torch[0:1, i]
             offset = torch.tensor([TCP_OFFSET], dtype=pose.dtype, device=pose.device)
             tcp = pose[:, :3] + quat_apply(pose[:, 3:7], offset) - origin
-            quat = pose[0, 3:7].detach().cpu().numpy().astype(np.float64)
+            # The gripper's orientation as (x, y, z, w), built from Isaac Lab's own rotation of the three basis
+            # vectors (quat_apply), so it is right whichever order body_link_pose_w stores its quaternion in.
+            basis = torch.eye(3, dtype=pose.dtype, device=pose.device)
+            cols = quat_apply(pose[:, 3:7].expand(3, 4), basis).detach().cpu().numpy().astype(np.float64)
+            quat = matrix_to_quat_xyzw(cols.T)
+            if _QUAT_CHECK and not _QUAT_LOGGED.get(arm):
+                _QUAT_LOGGED[arm] = True
+                raw = pose[0, 3:7].detach().cpu().numpy()
+                print(f"MECH_QUAT {arm}: body_link_pose_w quat={np.round(raw, 4).tolist()} "
+                      f"orientation (x, y, z, w)={np.round(quat, 4).tolist()}", flush=True)
             z = np.zeros(3)
             for key, p in ((f"{arm}_gripper", pose[0, :3] - origin), (f"{arm}_tcp", tcp[0])):
                 p = p.detach().cpu().numpy().astype(np.float64)

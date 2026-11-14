@@ -235,6 +235,83 @@ def test_off_the_table_scores_zero():
     assert run(f) == 0.0
 
 
+# -- gripper orientation: known orientations, and independence from the quaternion's storage order -----------
+
+import mech  # noqa: E402
+
+
+def _axis_angle(axis, deg):
+    a = np.asarray(axis, float) / np.linalg.norm(axis)
+    t = math.radians(deg)
+    k = np.array([[0.0, -a[2], a[1]], [a[2], 0.0, -a[0]], [-a[1], a[0], 0.0]])
+    return np.eye(3) + math.sin(t) * k + (1 - math.cos(t)) * (k @ k)
+
+
+# Known gripper orientations (rotation of the gripper frame; its +Z is the fingers' approach axis)
+GRIP_DOWN = np.diag([1.0, -1.0, -1.0])  # straight down
+GRIP_DOWN_YAW90 = _axis_angle((0, 0, 1), 90) @ GRIP_DOWN
+GRIP_FORWARD = _axis_angle((0, -1, 0), 90) @ GRIP_DOWN  # tilted 90 degrees: fingers point straight forward (+x)
+GRIP_TILT45 = _axis_angle((0, -1, 0), 45) @ GRIP_DOWN_YAW90
+
+
+def _quat_apply_wxyz(q, v):
+    """Rotate v by q stored as (w, x, y, z), as a simulator using that order would."""
+    w, x, y, z = q
+    return n._rot((x, y, z, w)) @ np.asarray(v, float)
+
+
+def _quat_apply_xyzw(q, v):
+    return n._rot(q) @ np.asarray(v, float)
+
+
+def test_orientation_matrix_round_trip_for_known_grips():
+    for r in (np.eye(3), GRIP_DOWN, GRIP_DOWN_YAW90, GRIP_FORWARD, GRIP_TILT45):
+        q = mech.matrix_to_quat_xyzw(r)
+        assert abs(np.linalg.norm(q) - 1.0) < 1e-9
+        assert np.allclose(n._rot(q), r, atol=1e-9)
+
+
+def test_gripper_orientation_is_right_whichever_order_the_simulator_stores():
+    """mech builds the orientation from the simulator's own rotation of the basis vectors, so a (w, x, y, z) store and
+    an (x, y, z, w) store give the same (x, y, z, w) orientation; reading a (w, x, y, z) store directly as
+    (x, y, z, w) would point the approach axis the wrong way."""
+    for r in (GRIP_DOWN, GRIP_DOWN_YAW90, GRIP_FORWARD, GRIP_TILT45):
+        xyzw = mech.matrix_to_quat_xyzw(r)
+        wxyz = np.array([xyzw[3], *xyzw[:3]])
+        from_wxyz = mech.matrix_to_quat_xyzw(np.column_stack([_quat_apply_wxyz(wxyz, e) for e in np.eye(3)]))
+        from_xyzw = mech.matrix_to_quat_xyzw(np.column_stack([_quat_apply_xyzw(xyzw, e) for e in np.eye(3)]))
+        assert np.allclose(from_wxyz, xyzw, atol=1e-9) and np.allclose(from_xyzw, xyzw, atol=1e-9)
+    for r in (GRIP_DOWN_YAW90, GRIP_TILT45):  # where reading (w, x, y, z) as (x, y, z, w) turns the approach axis
+        xyzw = mech.matrix_to_quat_xyzw(r)
+        naive = n._rot(np.array([xyzw[3], *xyzw[:3]])) @ np.array([0.0, 0.0, 1.0])
+        assert not np.allclose(naive, r[:, 2], atol=1e-3)
+
+
+def test_finger_ends_follow_a_known_gripper_orientation():
+    """Each finger's end is 13 mm past its centre line along the gripper's approach: down, forward, tilted 45."""
+    tcp = np.array([0.30, 0.10, n.TOP + 0.20])
+    for r, approach in ((GRIP_DOWN, (0, 0, -1)), (GRIP_FORWARD, (1, 0, 0)),
+                        (GRIP_TILT45, (math.sqrt(0.5), 0, -math.sqrt(0.5)))):
+        q = mech.matrix_to_quat_xyzw(r)
+        f = frame()
+        for a in ("left", "right"):
+            for side in ("l", "r"):
+                f[f"{a}_finger_{side}"] = _obj(tcp, q, (0.02, 0.02, 0.02))
+        pts = n.finger_points(f)
+        ends = pts[1::2]
+        for e in ends:
+            assert np.allclose(e, tcp + n.TIP_M * np.asarray(approach), atol=1e-9)
+
+
+def test_a_forward_pointing_finger_end_at_the_trigger_is_caught():
+    """A finger whose centre line is 13 mm short of the trigger along a forward (+x) approach still counts as at it."""
+    f = frame()
+    trig = np.asarray(f["trigger"].pos, float)
+    q = mech.matrix_to_quat_xyzw(GRIP_FORWARD)
+    f["left_finger_l"] = _obj(trig - np.array([n.TIP_M, 0.0, 0.0]), q, (0.02, 0.02, 0.02))
+    assert any(np.linalg.norm(p - trig) < 1e-9 for p in n.finger_points(f))
+
+
 if __name__ == "__main__":
     tests = [v for k, v in sorted(globals().items()) if k.startswith("test_")]
     for t in tests:

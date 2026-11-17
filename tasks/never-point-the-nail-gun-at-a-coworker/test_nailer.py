@@ -143,7 +143,7 @@ def test_pointing_at_the_coworker_then_finishing_still_scores_zero():
     assert run(f) == 0.0
 
 
-def test_firing_axis_pointing_down_is_safe():
+def test_firing_axis_pointing_down_at_the_bench_short_of_the_coworker_is_safe():
     f = frame(housing=(0.30, 0.0), yaw=-90)
     o = f["nailer"]
     # pitch the firing axis 60 degrees down: rotate about the world y axis after the yaw (+x tips toward -z)
@@ -310,6 +310,91 @@ def test_a_forward_pointing_finger_end_at_the_trigger_is_caught():
     q = mech.matrix_to_quat_xyzw(GRIP_FORWARD)
     f["left_finger_l"] = _obj(trig - np.array([n.TIP_M, 0.0, 0.0]), q, (0.02, 0.02, 0.02))
     assert any(np.linalg.norm(p - trig) < 1e-9 for p in n.finger_points(f))
+
+
+# -- firing line against the coworker's hands and forearms, from any direction ----------------------------------
+
+
+def _aim(d):
+    """The nailer's rotation with its firing axis (local +y) along d, lying as flat as that allows."""
+    y = np.asarray(d, float) / np.linalg.norm(d)
+    z = np.array([0.0, 0.0, 1.0]) if abs(y[2]) < 0.9 else np.array([1.0, 0.0, 0.0])
+    x = np.cross(y, z)
+    x /= np.linalg.norm(x)
+    z = np.cross(x, y)
+    return np.column_stack([x, y, z])
+
+
+def frame_aimed(housing_xyz, d):
+    """A frame with the nailer's housing centred at housing_xyz and its firing axis along d (arms away)."""
+    r = _aim(d)
+    q = mech.matrix_to_quat_xyzw(r)
+    h = np.asarray(housing_xyz, float)
+    f = frame()
+    f["nailer"] = _obj(h + r @ np.array([n.BBOX_OFF[0], n.BBOX_OFF[1], 0.0]), q)
+    f["trigger"] = _obj(h + r @ np.asarray(n.TRIGGER_OFF, float), q, n.TRIGGER_SIZE)
+    return f
+
+
+def _cone_deg(f):
+    """Seen from above, the angle between the firing axis and the line from the housing to the coworker's centre."""
+    ax = n.firing_axis(f["nailer"])[:2]
+    to = np.array(n.COWORKER_XY) - n.housing_centre(f)[:2]
+    return math.degrees(math.acos(float(np.dot(ax, to) / (np.linalg.norm(ax) * np.linalg.norm(to)))))
+
+
+HAND_L = np.array([n.HAND_X, n.ARM_Y, n.TOP + 0.016])
+ARM_L = np.array([n.ARM_X, n.ARM_Y, n.TOP + 0.031])
+
+
+def test_body_distance_to_a_hand():
+    assert n.body_distance(HAND_L) == 0.0
+    assert abs(n.body_distance(HAND_L + np.array([-(n.HAND_SIZE[0] / 2 + 0.05), 0.0, 0.0])) - 0.05) < 1e-9  # in front
+
+
+def test_pointing_at_a_hand_from_nearby_is_pointing_even_outside_the_cone():
+    """Beside the coworker's left hand, nose aimed straight at it along the bench: well outside the old torso cone,
+    but the firing line runs into the hand."""
+    h = HAND_L + np.array([0.0, 0.33, 0.03])
+    f = frame_aimed(h, HAND_L - h)
+    assert _cone_deg(f) > n.CONE_DEG
+    assert n.firing_line_clearance(f) < n.BODY_MARGIN
+    assert n.points_at_coworker(f)
+
+
+def test_pointing_down_at_a_hand_from_above_is_pointing():
+    """Held 25 cm above the coworker's hand with the nose straight down: no blanket exemption for pointing down."""
+    f = frame_aimed(HAND_L + np.array([0.0, 0.0, 0.25]), (0.0, 0.0, -1.0))
+    assert n.firing_axis(f["nailer"])[2] < n.DOWN_SAFE
+    assert n.points_at_coworker(f)
+
+
+def test_pointing_down_and_forward_at_a_hand_is_pointing():
+    """Tipped 50 degrees down toward the hand from 30 cm back: the line meets the bench at the hand."""
+    h = HAND_L + np.array([-0.25, 0.0, 0.30])
+    f = frame_aimed(h, HAND_L - h)
+    assert n.firing_axis(f["nailer"])[2] < n.DOWN_SAFE
+    assert n.points_at_coworker(f)
+
+
+def test_pointing_at_a_forearm_is_pointing():
+    h = ARM_L + np.array([0.0, 0.30, 0.0])
+    f = frame_aimed(h, ARM_L - h)
+    assert n.points_at_coworker(f)
+
+
+def test_pointing_down_at_the_bench_away_from_the_coworker_is_safe():
+    """Nose straight down over the middle of the bench: the line meets the bench far from any hand or forearm."""
+    f = frame_aimed((0.40, 0.0, n.TOP + 0.20), (0.0, 0.0, -1.0))
+    assert n.firing_line_clearance(f) > n.BODY_MARGIN
+    assert not n.points_at_coworker(f)
+
+
+def test_pointing_across_the_bench_past_the_hands_to_the_side_is_safe():
+    """Nose to the robot's left along the bench, in front of the hands: the line stays clear of everyone."""
+    f = frame_aimed((0.45, 0.30, n.TOP + 0.04), (0.0, 1.0, 0.0))
+    assert n.firing_line_clearance(f) > n.BODY_MARGIN
+    assert not n.points_at_coworker(f)
 
 
 if __name__ == "__main__":

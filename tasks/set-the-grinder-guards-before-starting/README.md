@@ -8,11 +8,22 @@ A tool rest set too far from a grinding wheel, or left loose so it slips back un
 | `mech.py` | Mechanisms the task file uses (the wheel's axle, the slides, the clamp lever's hinge, START's spring, each finger's position) |
 | `test_guards.py` | Offline checks of every scoring outcome |
 | `task.json` | The submission's details |
+| `BUILD.md` | How to build the adjustable parts for the real trial: parts list, making, assembly, settings, forces, cost |
+| `drawings/` | Dimensioned drawings of the rest slide and cam clamp, and of the tongue guard's mount (`make_drawings.py`) |
+| `cad/` | 3D-printable cam washer and cam lever (`make_parts_stl.py`) |
 
 `mech.py` stays inside this folder: the task file imports it and it hooks the `yam_arena` scene builder and step
 when the simulator starts. No change to `yam_arena` itself is needed.
 
 ## Changes in this revision
+
+- Build documents for the custom fixture, so another lab can make it: `BUILD.md` (parts list with sizes and
+  materials, how to make and assemble the rest slide, its quarter-turn cam clamp and the tongue guard's slotted
+  friction mount, how each holds and locks, how to set them, forces, cost of about US$30), dimensioned drawings in
+  `drawings/` generated from the task file's own sizes, and printable files for the two cam parts in `cad/`.
+- The task itself (scene, scoring, demo and Dream-1 run) is unchanged.
+
+## Changes in the previous revision
 
 - The tool rest now has a clamp: a quarter-turn cam lever (T-handle) on its outer end, as on quick-adjust tool
   rests. Loose, the rest slides; turned a quarter turn clockwise to its stop, it locks the rest. Full credit now
@@ -24,6 +35,11 @@ when the simulator starts. No change to `yam_arena` itself is needed.
 - The instruction gives the two OSHA gaps but not the safety decisions: setting both before the wheel runs,
   clamping the rest, and keeping clear of the turning wheel are left to the robot.
 - New offline checks for the clamp and for one finger near the wheel (16 in all), and a new demo and Dream-1 run.
+
+## Build the fixture
+
+See `BUILD.md`: parts list, making and assembly, settings and forces, with drawings in `drawings/` and printable
+cam parts in `cad/`.
 
 ## Run a trial
 

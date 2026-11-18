@@ -1,0 +1,20 @@
+{
+  "title": "Refill a table-top napkin dispenser with a new stack",
+  "category": "Impact on jobs",
+  "keywords": [
+    "bimanual",
+    "napkin dispenser",
+    "spring follower",
+    "restaurant",
+    "restocking"
+  ],
+  "instruction": "Refill the napkin dispenser with the new stack so it's ready for customers.",
+  "context": "Restocking napkin dispensers is a core task of waiters and waitresses (O*NET: \"Fill salt, pepper, sugar, cream, condiment, and napkin containers\"; about 2.3M US workers) and of fast food and counter workers (\"Stock customer service stations with paper products or beverage preparation items\"; about 3.9M), and dining room attendants (about 0.5M) restock tables too. It takes two hands: one holds the spring follower back while the other sets the stack in.",
+  "setup": "Positions are forward from the line through the two arm bases (61 cm apart) and sideways from the midline between them, left positive. The arms start in their folded ready pose. A stainless-steel open-top table-top napkin dispenser (all plates 4 mm stainless steel) is centred 34 cm out on the bare table: a 14.3 cm wide, 24.9 cm long floor (long side running left-right) with two side walls 4.9 cm high (inner width 13.5 cm); at its right end a front plate with two upright lips (1.6 cm wide, 4.9 cm high, leaving a 10.3 cm opening) and a 2.4 cm high bottom bar; and a spring-loaded follower, a 13 x 4 cm steel plate 4 cm high riding on the floor, with a 10 cm handle arm behind it (2.5 cm further from the robot than the centre line) ending in an upright 3 x 1.6 cm, 5.8 cm high handle tab. A spring (about 90 N/m, roughly 7 N on the stack) pushes the follower to the right against the front plate; it can be pulled back 11 cm. The dispenser starts empty with the follower forward (touching the front plate), its front plate 6 cm right of the midline. A new stack of 250 interfolded white beverage napkins (12.7 cm wide, 10 cm high, 7.5 cm thick, 0.3 kg, rigid block) stands on the bare table centred 34 cm out, 23 cm right of the midline, its 7.5 cm thickness running left-right.",
+  "scoring": "All measures are taken at the end of the run. Seated: the stack stands on the dispenser floor (its centre within 8 mm of its seated height), its centre within 1.5 cm of the dispenser's centre line, its tilt and its yaw each within 10 degrees, and its front face behind the front lips (not on top of or in front of them). Still: the stack and follower each move under 3 mm over the last second. Let go: the right gripper's centre at least 7 cm from the stack's centre and the left gripper's centre at least 6 cm from the follower's handle tab. 1.0: seated, still and let go, with the stack within 1.2 cm of the centre line, tilt and yaw each within 5 degrees, its front face within 5 mm of the lips, and the follower's face within 5 mm of the stack's back face (the follower pressing the stack against the lips). 0.5: seated, still and let go, but outside any of those 1.0 limits (up to the 10-degree and 1.5 cm limits), for example the follower not closed on the stack. 0.3: seated and still, the right gripper let go, but the left gripper still holding the handle tab. 0 otherwise, including doing nothing, the stack on top of the dispenser or the follower, in front of the lips, on its side, skewed more than 10 degrees, still in the right gripper or moving at the end.",
+  "run_limit": "1,200 steps (60 s at 20 Hz)",
+  "reset_notes": "Pull the follower back, take the stack out, set it on the table at its starting position and let the follower close against the front plate.",
+  "fidelity": "The stack is one rigid block (a banded stack of interfold napkins is stiff; the band is not modelled) at an estimated real size and mass; napkins are not dispensed. The follower rides on a friction-free slide joint with a spring and damper rather than rails; plates are 4 mm stainless steel, no feet. A generic open-top design, not a named product. Rest is rigid at real size.",
+  "scores": "Dream-1 run: 0; demo: 1.0",
+  "media": "M-KASNE8"
+}

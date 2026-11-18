@@ -1,0 +1,20 @@
+{
+  "title": "Put a gel in the tank with its wells at the black electrode",
+  "category": "Other",
+  "keywords": [
+    "gel electrophoresis",
+    "agarose gel",
+    "laboratory automation",
+    "orientation",
+    "tray handling"
+  ],
+  "instruction": "The gel has set: put it in the electrophoresis tank, ready for the buffer and samples.",
+  "context": "Agarose gel electrophoresis is one of the commonest molecular-biology steps done by hand. DNA is negatively charged and runs toward the red (+) electrode, so the wells must lie at the black (-) end; wells at the red end send the samples out of the gel into the buffer.",
+  "setup": "Table with two arm bases 61 cm apart; positions are forward from the line through the bases and sideways from the midline (left positive). A horizontal mini-gel tank (clear acrylic, 15 x 30 x 6 cm, 3 mm walls, long axis sideways) stands centred 38 cm out, 0 cm sideways: 12 mm end caps that house the electrodes (left cap red, right cap black, each with a matching 2 cm terminal jack on top), a platinum electrode wire in each buffer chamber, and a raised central gel deck (6 x 16 cm, 2 cm high) between them with a black tape mark across it 5.75 cm either side of its middle. A UV-transparent acrylic gel tray (10 x 7 cm, 3 mm floor, 2 mm side walls 1.2 cm tall, open ends) lies on the table centred 19 cm out, 0 cm sideways, turned 90 degrees to the tank (long side away from the robots). It holds a set 0.6 cm agarose gel (9.9 x 6.4 cm, pale green) with a row of 8 wells (5 x 5 mm, 3.5 mm deep, 7.5 mm pitch) 9 mm from the gel's far end. The arms start in their folded ready pose.",
+  "scoring": "Wells end: the end of the tray with the wells; its direction is compared with the direction of the black end cap. Seated: tray centre within 5 mm of the deck's centre, tray bottom within 2 mm of the deck top, tray within 3 degrees of level. Gel out: the gel more than 1 cm along the tray's length, 6 mm across or 8 mm in height from where it lies in a level tray, for 0.15 s or more (latched, cannot be undone). At rest: tray moved less than 3 mm over the last second and both grippers' centres at least 7 cm from the tray. 1.0: no gel-out; at rest, seated, wells end within 5 degrees of pointing at the black end. 0.5: no gel-out; at rest on the deck (within 15 mm of centre, 5 mm of seat height, 10 degrees of level) with the wells end within 15 degrees of the black end. Otherwise 0, including doing nothing, wells at the red end or sideways, gel out of the tray at any time, the tray off the deck, or still being held.",
+  "run_limit": "900 steps (45 s at 20 Hz)",
+  "reset_notes": "Fit the gel back in the tray (wells at the far end), set the tray on the table as described and wipe the deck and tray dry. The gel is cast beforehand in the tray (1 percent agarose, 6 mm thick); keep a spare cast gel for repeated trials.",
+  "fidelity": "Buffer is poured after the gel is placed (standard), so no liquid is modelled. Tank, tray and gel are rigid boxes at real size; the gel is a separate body that rests in the tray and can slide out of its open ends (same friction as other objects). The deck is 1 cm narrower than the tray so the fingers can release beside it; the tray is not clipped in place.",
+  "scores": "Dream-1 run: 0; demo: 1.0",
+  "media": "M-AXJBRK"
+}

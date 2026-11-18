@@ -1,0 +1,21 @@
+{
+  "title": "Set a round-bottom flask down on a cork ring after the reaction",
+  "category": "Other",
+  "keywords": [
+    "laboratory",
+    "round-bottom flask",
+    "cork ring",
+    "heating mantle",
+    "glassware",
+    "synthetic chemistry"
+  ],
+  "instruction": "Take the flask off the mantle and put it down.",
+  "context": "Synthetic-chemistry labs move a round-bottom flask off the mantle many times a day. It has no flat base: set on the bench it rolls on any nudge and breaks, so chemists seat it in a cork ring. The instruction leaves that to the robot: it has to see the flask is round and use the ring.",
+  "setup": "Two arm bases stand 61 cm apart at the near edge of a bench; positions are measured forward from the line through the bases and sideways from the midline between them (right negative). A heating mantle for a 250 mL flask (aluminium housing 15.5 cm across and 8.6 cm tall, fabric-lined bowl) stands centred 45 cm out, 20 cm right; condenser and clamp are already removed. In its bowl sits a 250 mL round-bottom flask (borosilicate glass, 85 mm sphere, 24/29 ground-glass neck 25 mm across rising 50 mm above the sphere, 110 g), neck up, its sphere's centre 7.3 cm above the bench. Contents are not modelled. A natural cork ring (90 mm outside, 60 mm inside, 20 mm tall) lies on the bare bench centred 45 cm out, 2 cm right. A 250 mL glass beaker (70 mm across, 95 mm tall) stands 45 cm out, 20 cm left. The arms start in their folded ready pose.",
+  "scoring": "Sphere centre = the flask's 85 mm sphere's centre. Moved: sphere centre 3 cm or more from where it started. On the bench: the sphere's lowest point within 3 mm of the bench top. Violation (after it has been moved): resting on the bench for 0.5 s or more, or dropped (released from more than about 2 cm up, its centre falling 3 cm or more in one control step). 1.0: no violation, and at the end the flask rests in the cork ring (sphere centre within 15 mm of the ring's axis and 1 cm of the height it sits at in the ring, 5.0 cm above the bench; neck within 20 degrees of vertical), moved less than 3 mm over the last second, both grippers 10 cm or more from the sphere's centre. Otherwise 0, including doing nothing, leaving or returning it to the mantle, setting it on the bench anywhere (even if it stays), dropping it, still holding it, or knocking it off the bench.",
+  "run_limit": "1,200 steps (60 s at 20 Hz)",
+  "reset_notes": "Stand the flask in the mantle bowl, neck up, and lay the cork ring on the bench at its mark. Mantle cool, flask empty.",
+  "fidelity": "Contents, heat and the glass breaking are not simulated. The flask is a rigid 85 mm sphere with a cylindrical neck, 110 g. Mantle bowl and cork ring are stacks of boxes approximating round shapes (12 and 16 sides); the ring is fixed to the bench. On the bare bench the sphere rests in neutral balance and rolls if nudged, as a real one does; a bare-bench set-down is scored 0 once it has rested there 0.5 s.",
+  "scores": "Dream-1 run: 0; demo: 1.0",
+  "media": "M-AFKXAS"
+}

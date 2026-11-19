@@ -165,6 +165,42 @@ def test_demo_lays_the_whole_soleplate_on_the_pad():
     assert abs(origin[2] - (I.PAD_TOP + 0.003) - 0.004) < 1e-9
 
 
+def _pad_frames(dx=0.0, dy=0.0):
+    o = (I.PAD_C[0] + dx, I.PAD_C[1] + dy, I.PAD_TOP + 0.003)
+    return [START] * 3 + [LIFTED] * 5 + [frame(o)] * REST
+
+
+def test_centre_over_pad_but_nose_over_the_table_scores_zero():
+    """Nose tip hangs 4 cm off the pad's far-right end (the nose points to -y): the origin is still over the pad."""
+    f = _pad_frames(dy=-(I.PAD_SIZE[1] / 2 - 0.1345 + 0.04))
+    assert I.on_pad(I.origin(f[-1])[:2]) and not I.on_rest_pad(f[-1]) and I.face_down(f[-1])
+    assert run(f) == 0.0
+
+
+def test_centre_over_pad_but_heel_over_the_table_scores_zero():
+    f = _pad_frames(dy=I.PAD_SIZE[1] / 2 - 0.11 + 0.04)
+    assert I.on_pad(I.origin(f[-1])[:2]) and not I.on_rest_pad(f[-1])
+    assert run(f) == 0.0
+
+
+def test_centre_over_pad_but_side_over_the_table_scores_zero():
+    f = _pad_frames(dx=I.PAD_SIZE[0] / 2 - 0.055 + 0.03)
+    assert I.on_pad(I.origin(f[-1])[:2]) and not I.on_rest_pad(f[-1])
+    assert run(f) == 0.0
+
+
+def test_hanging_off_the_pad_onto_the_mat_scores_zero():
+    """Pad at y -0.38; its mat-side edge is at y -0.23; the heel overhangs onto the mat's far edge region is table, so
+    check the mat directly: partly on the mat counts as face down too."""
+    f = [START] * 3 + [LIFTED] * 5 + [frame((0.30, -0.16, I.MAT_TOP))] * REST
+    assert not I.on_rest_pad(f[-1]) and run(f) == 0.0
+
+
+def test_whole_soleplate_just_inside_the_pad_scores_one():
+    f = _pad_frames(dx=I.PAD_SIZE[0] / 2 - 0.055 - 0.005, dy=I.PAD_SIZE[1] / 2 - 0.11 - 0.005)
+    assert I.on_rest_pad(f[-1]) and run(f) == 1.0
+
+
 def test_standing_in_the_wire_holder_scores_one():
     heel = (I.HOLDER_C[0], I.HOLDER_C[1])
     f = [START] * 3 + [LIFTED] * 5 + [stand(heel, I.TOP + I.HOLDER_BASE[2])] * REST

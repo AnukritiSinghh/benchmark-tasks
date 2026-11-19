@@ -102,7 +102,8 @@ COM = (-0.01, 0.0, 0.03)  # the weight is in the soleplate and heating element
 MOVED_M = 0.03  # moved: its origin at least this far (any direction) from where it started
 UPRIGHT_COS = math.cos(math.radians(20.0))  # on its heel: nose within 20 degrees of straight up
 FACE_DOWN_COS = math.cos(math.radians(30.0))  # soleplate facing within 30 degrees of straight down
-RESTING_M = 0.015  # ... with the soleplate this close to the surface under it
+RESTING_M = 0.015
+TOUCH_M = 0.005  # lying on it: the soleplate's lowest point within 5 mm of the surface (touching)  # ... with the soleplate's lowest point this close to the surface under it
 FACE_DOWN_S = 0.5  # face down this long (after lifting it) is setting it down face down
 STILL_S, STILL_M = 1.0, 0.003
 LET_GO_M = 0.07  # both TCPs at least this far from the handle's centre
@@ -211,22 +212,37 @@ def upright(objects) -> bool:
     return float(nose_dir(objects)[2]) >= UPRIGHT_COS
 
 
+# the soleplate's outline in the iron's frame: the back part's four corners, the nose tip and the nose's two side corners
+SOLE_PTS = [(-0.11, 0.055), (-0.11, -0.055), (0.06, 0.055), (0.06, -0.055), (0.085 + 0.07 / math.sqrt(2), 0.0),
+            (0.085, 0.07 / math.sqrt(2)), (0.085, -0.07 / math.sqrt(2))]
+
+
+def sole_points(objects):
+    """The world positions of the soleplate's outline points (on its bottom face)."""
+    return [iron_point(objects, (x, y, 0.0)) for x, y in SOLE_PTS]
+
+
 def lying_flat(objects) -> bool:
-    """Lying on its soleplate: the soleplate facing down (within 30 degrees) and resting on the surface under it."""
+    """Lying on its soleplate: the soleplate facing down (within 30 degrees) and some part of it resting on the surface
+    under it."""
     if float(soleplate_normal(objects)[2]) > -FACE_DOWN_COS:
         return False
-    o = origin(objects)
-    return o[2] - surface_z(o[:2]) <= RESTING_M
+    return min(float(p[2]) - surface_z(p[:2]) for p in sole_points(objects)) <= TOUCH_M
+
+
+def whole_sole_on_pad(objects) -> bool:
+    """Every point of the soleplate's outline is inside the rest pad's outline."""
+    return all(on_pad(p[:2]) for p in sole_points(objects))
 
 
 def on_rest_pad(objects) -> bool:
-    """Lying flat with its soleplate's middle over the heat-resistant rest pad."""
-    return lying_flat(objects) and on_pad(origin(objects)[:2])
+    """Lying flat with the whole soleplate within the heat-resistant rest pad's outline (none over shirt, mat or table)."""
+    return lying_flat(objects) and whole_sole_on_pad(objects)
 
 
 def face_down(objects) -> bool:
-    """Lying on its soleplate anywhere but the rest pad: on the shirt, the ironing mat or the bare table."""
-    return lying_flat(objects) and not on_pad(origin(objects)[:2])
+    """Lying on its soleplate with any part of it over the shirt, the ironing mat or the bare table."""
+    return lying_flat(objects) and not whole_sole_on_pad(objects)
 
 
 def heel_xy(objects):

@@ -64,7 +64,9 @@ PLATE_T = 0.003
 NOTCH_D, NOTCH_W = 0.060, 0.050  # notch depth (along the cover) and width
 POST_H, POST_X = 0.016, 0.040
 STRAP_L, STRAP_W, STRAP_T = 0.100, 0.020, 0.010
-COVER_KG = 0.25
+# real 1/3-size covers: ~0.7 mm sheet, 325 x 176 mm -> 0.32 kg, plus a rolled rim and strap = about 0.35 kg. The sim plate is
+# 3 mm (thicker, for stable contact) but carries the real mass.
+COVER_KG = {"cover_solid": 0.35, "cover_a": 0.33, "cover_b": 0.33}  # notched: less sheet
 COVER_Y = {"cover_solid": 0.370, "cover_a": 0.554, "cover_b": -0.370}
 BAR_DZ = PLATE_T / 2 + POST_H + STRAP_T / 2  # the strap bar's centre above the plate's centre (the grip)
 
@@ -147,8 +149,12 @@ for _name, _ns in COVERS.items():
     _pc = (CX, COVER_Y[_name])
     COVER_START[_name] = _pc
     OBJECTS.append(Box(_name, size=_msize, pos=(_pc[0] + _moff[0], _pc[1] + _moff[1], _plate_z()), color=STEEL,
-                       mass=COVER_KG))
+                       mass=COVER_KG[_name]))
     mech.compound(_name, _shifted(_parts, _moff) if _ns else _parts)
+    # a small marker welded at the plate's centre: the body's own origin is offset on a notched cover
+    OBJECTS.append(Box(_name + "_mark", size=(0.01, 0.01, PLATE_T), pos=(_pc[0], _pc[1], _plate_z()), color=STEEL,
+                       mass=0.002))
+    mech.weld(_name + "_mark", parent=_name)
 
 # -- scoring ---------------------------------------------------------------------------------------------------
 SEAT_Z_M = 0.003  # the plate's underside within 3 mm of the rim top
@@ -157,7 +163,7 @@ SEAT_TILT = math.cos(math.radians(3.0))
 SEAT_YAW = math.sin(math.radians(5.0))  # long side within 5 degrees of the pan's
 LADLE_MOVED_M, LADLE_TURNED = 0.03, math.cos(math.radians(10.0) / 2)
 STILL_S, STILL_M = 1.0, 0.003
-LET_GO_M = 0.07  # both TCPs this far from every cover's centre
+LET_GO_M = 0.03  # every finger and TCP this far from every cover's plate and strap (nothing touching it anywhere)
 NOTCHED_ON_EMPTY = 0.5  # a notched cover on the pan with no ladle counts half
 PAN_SHARE = 1.0 / 3.0
 _WINDOW = int(STILL_S * CONTROL_HZ)
@@ -172,12 +178,44 @@ def _rot(q):
     ])
 
 
+def plate_centre(objects, name):
+    """A cover's true plate centre: the welded marker's position (the body's origin is 3 cm off on a notched cover and
+    its reported position is a bounding-box centre)."""
+    return np.asarray(objects[name + "_mark"].pos, float)
+
+
+def cover_boxes(notch_sign):
+    """The cover's solid boxes in the plate-centre frame: (centre, half-size) for the plate pieces, posts and strap."""
+    s = notch_sign
+    if s == 0:
+        plate = [((0.0, 0.0, 0.0), (PAN_L / 2, PAN_W / 2, PLATE_T / 2))]
+    else:
+        side_w = (PAN_W - NOTCH_W) / 2
+        plate = [((-s * NOTCH_D / 2, 0.0, 0.0), ((PAN_L - NOTCH_D) / 2, PAN_W / 2, PLATE_T / 2))]
+        plate += [((s * (PAN_L / 2 - NOTCH_D / 2), sy * (NOTCH_W / 2 + side_w / 2), 0.0),
+                   (NOTCH_D / 2, side_w / 2, PLATE_T / 2)) for sy in (-1, 1)]
+    posts = [((0.0, sy * POST_X, PLATE_T / 2 + POST_H / 2), (STRAP_W / 2, 0.006, POST_H / 2)) for sy in (-1, 1)]
+    bar = [((0.0, 0.0, BAR_DZ), (STRAP_W / 2, STRAP_L / 2, STRAP_T / 2))]
+    return plate + posts + bar
+
+
+def gap_to_cover(objects, name, point):
+    """Distance (m) from a world point to the cover's plate outline, posts and strap (0 if inside)."""
+    c = plate_centre(objects, name)
+    q = _rot(objects[name].quat_xyzw).T @ (np.asarray(point, float) - c)
+    best = 1e9
+    for ctr, half in cover_boxes(COVERS[name]):
+        d = np.maximum(np.abs(q - np.asarray(ctr)) - np.asarray(half), 0.0)
+        best = min(best, float(np.linalg.norm(d)))
+    return best
+
+
 def _fresh():
     return dict(start={}, bad={}, hist=[], n=0)
 
 
 _state = _fresh()
-_TRACKED = tuple(COVERS) + tuple(LADLE_PANS)
+_TRACKED = tuple(COVERS) + tuple(n + "_mark" for n in COVERS) + tuple(LADLE_PANS)
 
 
 @mech.on_tick
@@ -195,15 +233,15 @@ def pan_of(pos):
     return None
 
 
-def seated_on(st_obj):
+def seated_on(st_obj, mark):
     """The pan index a cover rests flat on the pan's rim, else None: underside at the rim (3 mm), centred (1.5 cm),
     flat (3 degrees), square (5 degrees)."""
-    p = np.asarray(st_obj.pos, float)
+    r = _rot(st_obj.quat_xyzw)
+    p = np.asarray(mark.pos, float)  # the plate's true centre
     i = pan_of(p)
     if i is None:
         return None
-    r = _rot(st_obj.quat_xyzw)
-    if abs(float(st_obj.low[2]) - (TOP + RIM)) > SEAT_Z_M:
+    if abs(p[2] - PLATE_T / 2 - (TOP + RIM)) > SEAT_Z_M:
         return None
     if abs(p[0] - CX) > SEAT_XY_M or abs(p[1] - PAN_Y[i]) > SEAT_XY_M:
         return None
@@ -230,15 +268,15 @@ def still(st) -> bool:
 
 
 def let_go(objects) -> bool:
-    return all(np.linalg.norm(np.asarray(objects[a].pos, float) - np.asarray(objects[c].pos, float)) >= LET_GO_M
-               for a in ("left_tcp", "right_tcp") for c in COVERS)
+    return all(gap_to_cover(objects, c, objects[f"{a}{k}"].pos) >= LET_GO_M
+               for a in ("left", "right") for k in ("_tcp", "_finger_l", "_finger_r") for c in COVERS)
 
 
 def pan_scores(objects):
     """Credit per pan (left, middle, right) as the scene is now, before stillness and let-go."""
     out = [0.0, 0.0, 0.0]
     for name, notch in COVERS.items():
-        i = seated_on(objects[name])
+        i = seated_on(objects[name], objects[name + "_mark"])
         if i is None:
             continue
         ladle = [n for n, cy in LADLE_PANS.items() if cy == PAN_Y[i]]
@@ -255,8 +293,9 @@ def score(objects):
     """Per pan, a third of the score: a cover resting flat on the pan's rim (underside within 3 mm of the rim, centre
     within 1.5 cm of the pan's, within 3 degrees of level and 5 degrees of square), on the empty pan a solid cover
     (1/3) or a notched one (1/6), on a pan with a ladle one that is flat (which needs the notch round the handle),
-    while that ladle has stayed in place (never moved 3 cm or turned 10 degrees since the start). Counted only at the
-    end, with everything still for 1 s and both grippers 7 cm or more from every cover."""
+    while that ladle has stayed in place (never moved 3 cm or turned 10 degrees since the start). The plate centre is the
+    welded marker's, not the body origin. Counted only at the end, with everything still for 1 s and no finger or TCP of
+    either gripper within 3 cm of any cover's plate, posts or strap."""
     st = _state
     st["n"] += 1
     for n in _TRACKED:
@@ -270,7 +309,7 @@ def score(objects):
     sc = pan_scores(objects)
     if DEBUG and st["n"] % 20 == 0:
         info = " ".join(f"{n}=({objects[n].pos[0]:.3f},{objects[n].pos[1]:.3f},low {objects[n].low[2] - TOP:.4f},"
-                        f"seat {seated_on(objects[n])})" for n in COVERS)
+                        f"seat {seated_on(objects[n], objects[n + '_mark'])} mark ({objects[n + '_mark'].pos[0]:.3f},{objects[n + '_mark'].pos[1]:.3f}))" for n in COVERS)
         lad = " ".join(f"{n}=({objects[n].pos[0]:.3f},{objects[n].pos[1]:.3f},{objects[n].pos[2] - TOP:.3f}) "
                        f"bad={st['bad'].get(n, False)}" for n in LADLE_PANS)
         print(f"DBG t={st['n'] / CONTROL_HZ:.0f} {info} | {lad} still={still(st)} let_go={let_go(objects)} "

@@ -24,8 +24,9 @@ def _obj(pos, q=(0.0, 0.0, 0.0, 1.0), lo=None, hi=None):
     return ObjectState(pos, np.asarray(q, float), np.zeros(3), np.zeros(3), lo, hi)
 
 
-def cover_state(xy, bottom_z, tilt_deg=0.0, yaw_deg=0.0):
-    """A cover with its underside at bottom_z (absolute), its centre over xy."""
+def cover_state(xy, bottom_z, tilt_deg=0.0, yaw_deg=0.0, origin_off=(0.0, 0.0)):
+    """A cover with its underside at bottom_z (absolute), its plate centre over xy. Returns (body, welded marker).
+    origin_off is the body origin's offset from the plate centre in the cover's own frame (0.03 for a notched cover)."""
     pos = np.array([xy[0], xy[1], bottom_z + Z_HALF])
     ay, az = math.radians(tilt_deg) / 2, math.radians(yaw_deg) / 2
     qy = np.array([0, math.sin(ay), 0, math.cos(ay)])
@@ -34,7 +35,10 @@ def cover_state(xy, bottom_z, tilt_deg=0.0, yaw_deg=0.0):
     x2, y2, z2, w2 = qy
     q = np.array([w1 * x2 + x1 * w2 + y1 * z2 - z1 * y2, w1 * y2 - x1 * z2 + y1 * w2 + z1 * x2,
                   w1 * z2 + x1 * y2 - y1 * x2 + z1 * w2, w1 * w2 - x1 * x2 - y1 * y2 - z1 * z2])
-    return _obj(pos, q, pos - [0.16, 0.09, Z_HALF], pos + [0.16, 0.09, Z_HALF])
+    mark = _obj([xy[0], xy[1], bottom_z + S.PLATE_T / 2], q)
+    r = S._rot(q)
+    body_pos = pos + r @ np.array([origin_off[0], origin_off[1], 0.0])
+    return _obj(body_pos, q, pos - [0.16, 0.09, Z_HALF], pos + [0.16, 0.09, Z_HALF]), mark
 
 
 def ladle_state(name, dx=0.0, dz=0.0, turn_deg=0.0):
@@ -50,10 +54,16 @@ START = {"cover_solid": (S.CX, 0.370, S.TOP), "cover_a": (S.CX, 0.554, S.TOP), "
 def frame(covers=None, ladles=None, left=AWAY_L, right=AWAY_R):
     c = dict(START)
     c.update(covers or {})
-    f = {n: cover_state((v[0], v[1]), v[2]) if isinstance(v, tuple) else v for n, v in c.items()}
+    f = {}
+    for n, v in c.items():
+        body, mark = cover_state((v[0], v[1]), v[2]) if len(v) == 3 else v
+        f[n], f[n + "_mark"] = body, mark
     for n in S.LADLE_PANS:
         f[n] = (ladles or {}).get(n, ladle_state(n))
-    f["left_tcp"], f["right_tcp"] = _obj(left), _obj(right)
+    for arm, p in (("left", left), ("right", right)):  # fingers 1.3 cm either side of the TCP (along y)
+        f[f"{arm}_tcp"] = _obj(p)
+        for k, dy in (("l", 0.013), ("r", -0.013)):
+            f[f"{arm}_finger_{k}"] = _obj((p[0], p[1] + dy, p[2]))
     return f
 
 
@@ -177,6 +187,45 @@ def test_ladle_removal_does_not_cost_the_other_pans():
 def test_cover_knocked_off_the_table_scores_zero():
     f = frame({"cover_solid": (S.CX, 0.9, S.TOP - 0.5)})
     assert run([f] * REST) == 0.0
+
+
+def test_centred_solid_cover_scores():
+    f = frame({"cover_solid": (S.CX, MID, SEAT)})
+    assert abs(run([f] * REST) - 1 / 3) < 1e-3
+
+
+def test_notched_cover_centred_with_offset_origin_scores():
+    """Plate centred on the left pan, body origin 3 cm off (as the real body); the body position must not matter."""
+    c = cover_state((S.CX, LEFT), SEAT, origin_off=(0.03, 0.0))
+    f = frame({"cover_a": c})
+    assert abs(run([f] * REST) - 1 / 3) < 1e-3
+    c = cover_state((S.CX, LEFT), SEAT, yaw_deg=180.0, origin_off=(0.03, 0.0))  # turned half a turn
+    assert abs(run([frame({"cover_a": c})] * REST) - 1 / 3) < 1e-3
+
+
+def test_notched_cover_origin_near_pan_centre_but_plate_off_fails():
+    """The body origin is on the pan's centre (old rule: seated) but the plate is 3 cm off, so it does not count."""
+    c = cover_state((S.CX - 0.03, LEFT), SEAT, origin_off=(0.03, 0.0))
+    assert c[0].pos[0] > S.CX - 0.001 and abs(c[0].pos[0] - S.CX) < 0.001
+    assert run([frame({"cover_a": c})] * REST) == 0.0
+
+
+def test_gripper_holding_a_cover_by_its_edge_is_not_released():
+    edge = (S.CX + S.PAN_L / 2 - 0.01, MID, SEAT + 0.001)  # far from the origin, at the plate's short edge
+    f = frame(seated(), right=edge)
+    assert run([frame()] * 3 + [f] * REST) == 0.0
+    f = frame(seated(), right=(S.CX, MID + S.PAN_W / 2 - 0.005, SEAT + 0.001))  # long edge
+    assert run([f] * REST) == 0.0
+
+
+def test_finger_touching_the_strap_is_not_released():
+    f = frame(seated(), left=(S.CX, MID, SEAT + S.BAR_DZ + S.PLATE_T / 2))
+    assert run([f] * REST) == 0.0
+
+
+def test_finger_just_clear_of_the_cover_is_released():
+    f = frame(seated(), left=(S.CX + 0.25, 0.0, SEAT + 0.05))
+    assert run([f] * REST) == 1.0
 
 
 def test_demo_waypoints_are_reachable_values():

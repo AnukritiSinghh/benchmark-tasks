@@ -1,0 +1,21 @@
+{
+  "title": "Put a returned multimeter into the one empty case on a shelf of identical cases",
+  "category": "Impact on jobs",
+  "keywords": [
+    "bimanual",
+    "sliding lid",
+    "tool crib",
+    "multimeter",
+    "electricians",
+    "maintenance"
+  ],
+  "instruction": "Put the returned multimeter away in its case.",
+  "context": "Electricians (0.8M US workers) and maintenance and repair workers (1.5M) check handheld test meters out of a shared tool crib and return them to identical hard cases on a shelf. The returned meter belongs in the one case that is empty; forcing it into an occupied case damages both meters. The cases are shut, so the robot has to open them to find the empty one.",
+  "setup": "Arm bases stand 60 cm apart at the near edge of a table; positions are measured forward from the line through the bases and sideways from the midline. Three identical hard cases (ABS plastic, black, 14.5 cm front to back x 20 cm wide x 5.4 cm tall, 1 cm foam-lined floor, a 11.5 x 17 cm recess 4.4 cm deep) stand side by side, centred 30 cm out and at 23 cm left, 0 and 23 cm right (3 cm gaps). Each has an opaque sliding lid (ABS, dark grey, 14.5 x 20 cm, 8 mm thick, 0.12 kg, grey 3 x 4 x 2.6 cm finger knob at its front edge) that slides straight back 15.5 cm to open. Two cases each hold a handheld digital multimeter (15 x 7.5 x 3.6 cm, 0.2 kg, yellow rubber holster, grey display window, black range dial, three input jacks at the bottom end, no leads) lying flat in the recess with its long side across the case; the middle case is empty (variant 0, the submitted layout). A third identical multimeter, the returned one, lies flat on the bench 12 cm out, on the midline, its long side across the bench. All lids start closed. The arms start in their folded ready pose. Layouts: an evaluation is three trials, identical except which case is empty: the middle one (layout 0, shown in the screenshot), the right-hand one (layout 1) or the left-hand one (layout 2); the empty case's lid looks the same as the others.",
+  "scoring": "Positions are measured with a tape or from the video. In the empty case: the returned meter lies flat (within 20 degrees of level) inside the empty case's recess, its centre within the recess outline. Still: moved less than 3 mm over the last second, both grippers' centres at least 7 cm from the meter. Closed lid: within 5 mm of its closed position. Violation: the returned meter rests (half a second or more) inside an occupied case's recess or on top of the meter stored in it. 0: doing nothing (the meter never reaches the empty case), a violation (it cannot be undone), the meter anywhere else, on a lid, on its side, still held, or not at rest. Otherwise, with the meter at rest in the empty case: 1.0 with all three lids closed; 0.5 with exactly one lid open; 0.25 with two or three lids open. If a stored meter is moved 2 cm or more, the score is at most 0.25. The task score is the mean of the three trials' scores (one per layout).",
+  "run_limit": "2,000 steps (100 seconds at 20 Hz)",
+  "reset_notes": "Slide all three lids shut, put the stored meters back flat in the two occupied recesses (variant 0: left and right cases) and the returned meter on its mark on the bench. For variants 1 and 2, the empty case is the right-hand or left-hand one.",
+  "fidelity": "Rigid parts at real size and mass. The sliding lid is modelled as a frictional slide on a straight rail with light damping; leads and probes are omitted. The meter is a rigid compound of boxes (holster, display, dial, jacks), the foam floor is a hard flat surface, and the recess has 1-2 cm of clearance per side so the gripper pads fit beside the meter.",
+  "scores": "Dream-1 run: 0 (layout 0); demo: 1.0 on each of the three layouts",
+  "media": "M-WCZ4XK"
+}
